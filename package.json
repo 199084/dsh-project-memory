@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "type": "module",
-  "description": "Human-owned, project-scoped memory for DeepSeek Harness.",
+  "description": "Human-owned, project-scoped memory for DeepSeek Harness: MEMORY.md as labeled runtime context, read-only lookups with line citations, and lazy, human-approved memory updates. DeepSeek Harness 项目记忆插件：由人掌控，随仓库版本化，带来源注入与只读检索。",
   "main": "index.mjs",
   "exports": {
     ".": "./index.mjs",
@@ -23,5 +23,13 @@
     "test": "node --test test/*.test.mjs"
   },
   "license": "MIT",
-  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "memory", "project-memory"]
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "project-memory",
+    "agent-memory",
+    "plugin"
+  ]
 }
