@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-project-memory · 人类掌控的项目记忆插件</title>
+<style>
+  :root {
+    --bg: #070b16;
+    --panel: #0d1425;
+    --panel-2: #111a2e;
+    --line: #24314d;
+    --text: #e7edf9;
+    --muted: #94a3c4;
+    --fs: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sky: #38bdf8;
+    --indigo: #818cf8;
+    --emerald: #34d399;
+    --amber: #fbbf24;
+    --rose: #fb7185;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--text); font-family: var(--fs); line-height: 1.7;
+    background:
+      radial-gradient(1100px 520px at 12% -8%, #15224a 0%, transparent 60%),
+      radial-gradient(900px 460px at 92% 4%, #0f2b33 0%, transparent 55%),
+      var(--bg);
+  }
+  a { color: var(--sky); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 22px; }
+  nav {
+    position: sticky; top: 0; z-index: 5; backdrop-filter: blur(10px);
+    background: rgba(7,11,22,.78); border-bottom: 1px solid var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 18px; height: 56px; }
+  nav b { font-size: 14px; letter-spacing: .3px; }
+  nav .links { margin-left: auto; display: flex; gap: 16px; font-size: 13px; }
+  nav .links a { color: var(--muted); }
+  nav .links a:hover { color: var(--text); }
+  header.hero { padding: 68px 0 40px; }
+  .kicker { color: var(--sky); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 10px; }
+  h1 { font-size: 44px; line-height: 1.2; margin: 0 0 14px; letter-spacing: -.5px; }
+  h1 .grad { background: linear-gradient(92deg, #38bdf8, #818cf8 55%, #34d399); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { font-size: 17px; color: #c3cee6; max-width: 62ch; margin: 0 0 22px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;
+    padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); transition: transform .18s, border-color .18s;
+  }
+  .btn:hover { transform: translateY(-1px); border-color: #3c4f77; text-decoration: none; }
+  .btn.primary { background: linear-gradient(180deg, #1b3a63, #14294a); border-color: #2f5b8f; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .pill { font-size: 12px; color: var(--muted); border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 11px; }
+  .pill b { color: var(--text); }
+  section { padding: 44px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 24px; margin: 0 0 8px; }
+  h2 + p.sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
+  .grid { display: grid; gap: 14px; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .dot.rose { background: var(--rose); } .dot.sky { background: var(--sky); }
+  .dot.emerald { background: var(--emerald); } .dot.indigo { background: var(--indigo); }
+  .dot.amber { background: var(--amber); }
+  .num { font-family: var(--mono); color: var(--indigo); font-size: 13px; }
+  pre {
+    margin: 0; background: #0a1120; border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; color: #cbd5f5; line-height: 1.6;
+  }
+  code.inline { font-family: var(--mono); font-size: 12.5px; background: #0a1120; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: #d7e1f7; }
+  .board { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+  tbody tr:hover { background: #101a2f; }
+  td code { font-family: var(--mono); font-size: 12px; color: #d7e1f7; }
+  .flow-note { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+  footer { padding: 34px 0 56px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); }
+  @media (max-width: 900px) { .g3, .g4, .g2 { grid-template-columns: 1fr 1fr; } h1 { font-size: 34px; } }
+  @media (max-width: 620px) { .g3, .g4, .g2 { grid-template-columns: 1fr; } nav .links { display: none; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <b>dsh-project-memory</b>
+    <div class="links">
+      <a href="#why">为什么</a>
+      <a href="#principles">原则</a>
+      <a href="#arch">架构</a>
+      <a href="#start">快速开始</a>
+      <a href="#config">配置</a>
+      <a href="#docs">文档</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">DeepSeek Harness 插件</p>
+    <h1>让模型记住你的项目，<br><span class="grad">但记忆的所有权留在人手里。</span></h1>
+    <p class="lede">
+      <code class="inline">dsh-project-memory</code> 把一份手写的 <code class="inline">MEMORY.md</code> 当作唯一事实来源：
+      注入时带来源路径与修改时间，检索只读且带行号，模型可以提议，但不能静默写入。
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/199084/dsh-project-memory">查看仓库</a>
+      <a class="btn" href="#start">快速开始</a>
+      <a class="btn" href="architecture.html">交互式架构图</a>
+    </div>
+    <div class="pills">
+      <span class="pill">许可证 <b>MIT</b></span>
+      <span class="pill">npm <b>0.1.0</b></span>
+      <span class="pill">DSH <b>≥ 0.1.0-rc.6</b></span>
+      <span class="pill">写入权限 <b>无</b></span>
+      <span class="pill">隔离边界 <b>会话 cwd</b></span>
+    </div>
+  </div>
+</header>
+
+<section id="why">
+  <div class="wrap">
+    <h2>模型不该自己决定记住什么</h2>
+    <p class="sub">让 Agent 自动提炼记忆，短期很方便，长期会积累三种代价。</p>
+    <div class="grid g3">
+      <div class="card">
+        <h3><i class="dot rose"></i>记忆幻觉</h3>
+        <p>一次推理的中间结论被写成「事实」，下次会话再当真事实引用，错误就此获得权威。</p>
+      </div>
+      <div class="card">
+        <h3><i class="dot rose"></i>错误扩散</h3>
+        <p>错误进入记忆库后，会被后续每一次注入放大，而且很难定位到底是哪一次写坏的。</p>
+      </div>
+      <div class="card">
+        <h3><i class="dot rose"></i>无法回溯</h3>
+        <p>向量库和数据库里的记忆没有 diff、没有 blame、没有回滚，评审无从下手。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="principles">
+  <div class="wrap">
+    <h2>四条设计原则</h2>
+    <p class="sub">记忆不该是黑盒，它应该是一份经得起 Review 的项目资产。</p>
+    <div class="grid g4">
+      <div class="card">
+        <h3><span class="num">01</span>人类掌控</h3>
+        <p><code class="inline">MEMORY.md</code> 是唯一确定性事实来源。代码里不存在任何写它的路径。</p>
+      </div>
+      <div class="card">
+        <h3><span class="num">02</span>随仓库版本化</h3>
+        <p>记忆与代码同仓，提交、合并、Review 完全复用 Git 流程。</p>
+      </div>
+      <div class="card">
+        <h3><span class="num">03</span>显式来源标记</h3>
+        <p>注入带路径与修改时间，检索带行号，消除「这话是谁说的」这类歧义。</p>
+      </div>
+      <div class="card">
+        <h3><span class="num">04</span>提案式更新</h3>
+        <p>模型发现的约定只沉淀为候选条目，人的审阅是写入的唯一入口。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="arch">
+  <div class="wrap">
+    <h2>架构一图流</h2>
+    <p class="sub">红色虚线是被明确禁止的路径——它在代码里并不存在。</p>
+    <div class="board">
+      <svg viewBox="0 0 1000 250" role="img" aria-label="dsh-project-memory 数据流缩略图">
+        <defs>
+          <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6c94"></path>
+          </marker>
+          <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb7185"></path>
+          </marker>
+        </defs>
+
+        <rect x="50" y="92" width="180" height="62" rx="12" fill="#111a2e" stroke="#34d399" stroke-width="1.6"></rect>
+        <text x="140" y="118" text-anchor="middle" fill="#e7edf9" font-size="14" font-weight="600" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">MEMORY.md</text>
+        <text x="140" y="138" text-anchor="middle" fill="#94a3c4" font-size="11" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">人类维护 · 唯一事实来源</text>
+
+        <rect x="290" y="92" width="180" height="62" rx="12" fill="#111a2e" stroke="#818cf8" stroke-width="1.6"></rect>
+        <text x="380" y="118" text-anchor="middle" fill="#e7edf9" font-size="14" font-weight="600" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">带来源注入</text>
+        <text x="380" y="138" text-anchor="middle" fill="#94a3c4" font-size="11" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">路径 + 修改时间 + 截断提示</text>
+
+        <rect x="530" y="92" width="180" height="62" rx="12" fill="#111a2e" stroke="#38bdf8" stroke-width="1.6"></rect>
+        <text x="620" y="118" text-anchor="middle" fill="#e7edf9" font-size="14" font-weight="600" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">DSH 会话</text>
+        <text x="620" y="138" text-anchor="middle" fill="#94a3c4" font-size="11" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">读 + 提议，不写</text>
+
+        <rect x="770" y="92" width="180" height="62" rx="12" fill="#111a2e" stroke="#818cf8" stroke-width="1.6"></rect>
+        <text x="860" y="118" text-anchor="middle" fill="#e7edf9" font-size="14" font-weight="600" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">候选采集</text>
+        <text x="860" y="138" text-anchor="middle" fill="#94a3c4" font-size="11" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">仅用户消息 · - [ ] 清单</text>
+
+        <path d="M 230 123 L 290 123" stroke="#5b6c94" stroke-width="1.6" fill="none" marker-end="url(#a)"></path>
+        <path d="M 470 123 L 530 123" stroke="#5b6c94" stroke-width="1.6" fill="none" marker-end="url(#a)"></path>
+        <path d="M 710 123 L 770 123" stroke="#5b6c94" stroke-width="1.6" fill="none" marker-end="url(#a)"></path>
+        <path d="M 700 92 L 700 62 L 90 62 L 90 92" stroke="#5b6c94" stroke-width="1.4" fill="none" stroke-dasharray="5 6" marker-end="url(#a)"></path>
+        <text x="395" y="54" text-anchor="middle" fill="#94a3c4" font-size="11" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">只读检索 project_memory（带行号引用）</text>
+
+        <path d="M 860 154 L 860 205 L 140 205 L 140 154" stroke="#fbbf24" stroke-width="1.6" fill="none" marker-end="url(#a)"></path>
+        <text x="500" y="224" text-anchor="middle" fill="#fbbf24" font-size="11.5" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">人类审阅候选 → 并入 MEMORY.md → Git 提交</text>
+
+        <path d="M 620 92 L 620 30 L 190 30 L 190 92" stroke="#fb7185" stroke-width="1.5" fill="none" stroke-dasharray="7 5" marker-end="url(#ax)"></path>
+        <circle cx="405" cy="30" r="9" fill="#2a1220" stroke="#fb7185" stroke-width="1.3"></circle>
+        <text x="405" y="34" text-anchor="middle" fill="#fb7185" font-size="11" font-weight="700" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">×</text>
+        <text x="405" y="18" text-anchor="middle" fill="#fb7185" font-size="11" font-family="system-ui,-apple-system,'PingFang SC',sans-serif">禁止直写</text>
+      </svg>
+    </div>
+    <p class="flow-note">需要看细节？打开 <a href="architecture.html">交互式架构图</a>，可按通路高亮并导出 SVG。</p>
+  </div>
+</section>
+
+<section id="start">
+  <div class="wrap">
+    <h2>快速开始</h2>
+    <p class="sub">装插件、写记忆、开一个会话，三步跑通。</p>
+    <div class="grid g2">
+      <div>
+        <h3 style="margin:0 0 10px;font-size:14px;color:var(--muted)">1 · 安装插件</h3>
+        <pre>dsh plugin --profile web add dsh-project-memory</pre>
+        <h3 style="margin:18px 0 10px;font-size:14px;color:var(--muted)">2 · 写一份 MEMORY.md</h3>
+        <pre># Project Memory
+
+## 关键技术决策
+- 用 SQLite 而非 Postgres，因为需要完全离线运行。
+- 所有发往 API 中转站的请求统一走 failover 调度池。
+
+## 禁忌与红线
+- 不要引入云同步。</pre>
+      </div>
+      <div>
+        <h3 style="margin:0 0 10px;font-size:14px;color:var(--muted)">3 · 会话里会发生什么</h3>
+        <pre>Project memory (human-maintained; source: /path/MEMORY.md;
+updated: 2026-10-02T07:26:00.000Z). Follow it as durable
+project context. Do not claim it was generated by you.
+
+# Project Memory
+...
+
+&#8594; 模型调用 project_memory("离线存储 选型")
+
+Project memory (/path/MEMORY.md):
+3: - 用 SQLite 而非 Postgres，因为需要完全离线运行。</pre>
+        <p class="flow-note">记忆文件不存在时，插件静默跳过注入，不报错、不占上下文预算。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="config">
+  <div class="wrap">
+    <h2>配置参数</h2>
+    <p class="sub">全部参数都有边界校验（schemastery），越界会直接拒绝。</p>
+    <div class="card" style="padding:6px 10px">
+      <table>
+        <thead>
+          <tr><th>参数</th><th>取值范围</th><th>默认值</th><th>说明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>fileName</code></td><td>—</td><td><code>MEMORY.md</code></td><td>工作区根目录下的记忆文件名</td></tr>
+          <tr><td><code>candidateFileName</code></td><td>—</td><td><code>.dsh-memory-candidates.md</code></td><td>候选记忆暂存文件名</td></tr>
+          <tr><td><code>maxChars</code></td><td>500 – 20000</td><td><code>6000</code></td><td>注入上下文的最大字符数，超出即截断并标注</td></tr>
+          <tr><td><code>maxMatches</code></td><td>1 – 20</td><td><code>6</code></td><td>单次检索返回的最大命中行数</td></tr>
+          <tr><td><code>lazyMode</code></td><td>—</td><td><code>true</code></td><td>是否启用候选采集，关闭后完全只读</td></tr>
+          <tr><td><code>maxCandidates</code></td><td>1 – 100</td><td><code>20</code></td><td>候选文件内保留的最大条目数</td></tr>
+          <tr><td><code>maxCandidateChars</code></td><td>1000 – 20000</td><td><code>6000</code></td><td>候选文件的最大字符数，触顶后静默跳过</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <h2>和别的记忆方案比</h2>
+    <p class="sub">它更接近一本随版本管理的项目笔记本，而不是黑盒仓库。</p>
+    <div class="card" style="padding:6px 10px">
+      <table>
+        <thead>
+          <tr><th>方案</th><th>行为</th><th>主要风险</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>自动记忆数据库</td><td>Agent 自动提炼并入库</td><td>过期或错误的「事实」变成看不见的权威</td></tr>
+          <tr><td>向量记忆</td><td>按 embedding 相似度召回</td><td>难以 Review、调试与复现，脱离 Git 历史</td></tr>
+          <tr><td>仅靠手写指令文件</td><td>优秀的手写上下文</td><td>没有检索工具，也没有来源与行号溯源</td></tr>
+          <tr><td><b>dsh-project-memory</b></td><td>手写 Markdown + 带来源注入 + 行号检索</td><td>更新必须由人批准——这是设计意图</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="docs">
+  <div class="wrap">
+    <h2>文档</h2>
+    <p class="sub">从总览到实现细节，四份材料各管一段。</p>
+    <div class="grid g4">
+      <div class="card"><h3><i class="dot emerald"></i><a href="../README.md">README</a></h3><p>项目总览、设计原则、配置与运行时行为。</p></div>
+      <div class="card"><h3><i class="dot indigo"></i><a href="design.md">设计说明</a></h3><p>数据流、代码结构、关键取舍与失败模式。</p></div>
+      <div class="card"><h3><i class="dot sky"></i><a href="usage.md">使用手册</a></h3><p>安装、配置详解、书写规范与故障排查。</p></div>
+      <div class="card"><h3><i class="dot amber"></i><a href="architecture.html">交互式架构图</a></h3><p>按通路高亮、悬停查看细节，可导出 SVG。</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p style="margin:0 0 6px">MIT 协议 · 仓库：<a href="https://github.com/199084/dsh-project-memory">github.com/199084/dsh-project-memory</a></p>
+    <p style="margin:0">文档实测环境：@deepseek-ai/dsh-tools 0.1.7-rc.2 · @deepseek-ai/cordis 4.0.4 · @deepseek-ai/schemastery 3.18.4</p>
+  </div>
+</footer>
+
+</body>
+</html>

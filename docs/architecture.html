@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-project-memory 架构与数据流</title>
+<style>
+  :root {
+    --bg: #070b16;
+    --panel: #0d1425;
+    --panel-2: #111a2e;
+    --line: #24314d;
+    --text: #e7edf9;
+    --muted: #94a3c4;
+    --fs: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sky: #38bdf8;
+    --indigo: #818cf8;
+    --emerald: #34d399;
+    --amber: #fbbf24;
+    --rose: #fb7185;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; padding: 28px 20px 56px;
+    background: radial-gradient(1200px 600px at 15% -10%, #14213d 0%, var(--bg) 55%) fixed;
+    color: var(--text); font-family: var(--fs); line-height: 1.6;
+  }
+  .wrap { max-width: 1220px; margin: 0 auto; }
+  header h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: .3px; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+  .meta { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    font-size: 12px; color: var(--muted); border: 1px solid var(--line);
+    background: var(--panel); border-radius: 999px; padding: 3px 10px;
+  }
+  .pill b { color: var(--text); font-weight: 600; }
+  .toolbar { margin: 18px 0 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button {
+    font-family: inherit; font-size: 13px; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 9px; padding: 7px 13px; cursor: pointer;
+    transition: border-color .18s, background .18s, transform .18s;
+  }
+  button:hover { border-color: #3c4f77; transform: translateY(-1px); }
+  button[aria-pressed="true"] { border-color: var(--sky); background: #10233a; }
+  button:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+  .legend { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 22px; height: 3px; border-radius: 2px; display: inline-block; }
+  .board {
+    background: linear-gradient(180deg, rgba(17,26,46,.85), rgba(13,20,37,.85));
+    border: 1px solid var(--line); border-radius: 18px; padding: 6px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  }
+  svg { display: block; width: 100%; height: auto; }
+  .grid line { stroke: #182238; stroke-width: 1; }
+  .node rect {
+    fill: var(--panel-2); stroke: var(--line); stroke-width: 1.4;
+    transition: stroke .2s, filter .2s;
+  }
+  .node { cursor: pointer; }
+  .node:hover rect, .node.pinned rect { stroke-width: 2.2; filter: drop-shadow(0 0 14px rgba(56,189,248,.28)); }
+  .node.workspace rect { stroke: var(--emerald); }
+  .node.plugin rect { stroke: var(--indigo); }
+  .node.session rect { stroke: var(--sky); }
+  .node.human rect { stroke: var(--amber); }
+  .node .title { fill: var(--text); font-size: 15px; font-weight: 600; }
+  .node .sub { fill: var(--muted); font-size: 11.5px; }
+  .node .tag { fill: var(--muted); font-size: 10.5px; font-family: var(--mono); letter-spacing: .4px; }
+  .edge { fill: none; stroke: #3d4d70; stroke-width: 1.6; marker-end: url(#arrow); transition: stroke .2s, stroke-width .2s; }
+  .edge.dim { opacity: .18; }
+  .edge.hot { stroke-width: 2.6; }
+  .edge.inject.hot { stroke: var(--sky); }
+  .edge.lookup.hot { stroke: var(--indigo); }
+  .edge.candidate.hot { stroke: var(--emerald); }
+  .edge.human.hot { stroke: var(--amber); }
+  .edge.forbidden { stroke: var(--rose); stroke-dasharray: 7 5; }
+  .edge.forbidden.hot { stroke: var(--rose); }
+  .flow { stroke-dasharray: 5 9; animation: dash 1.1s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -28; } }
+  .elabel { fill: var(--muted); font-size: 11px; }
+  .elabel.hot { fill: var(--text); font-weight: 600; }
+  .elabel.warn { fill: var(--rose); font-weight: 600; }
+  .vlabel { fill: var(--muted); font-size: 11px; }
+  .badge-x circle { fill: #2a1220; stroke: var(--rose); stroke-width: 1.4; }
+  .badge-x text { fill: var(--rose); font-size: 12px; font-weight: 700; }
+  .panel {
+    margin-top: 14px; display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 14px; }
+  .card p { margin: 0; color: var(--muted); font-size: 13px; }
+  .card code { font-family: var(--mono); font-size: 12px; color: #cbd5f5; background: #0a1120; padding: 1px 5px; border-radius: 5px; }
+  .steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .steps li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); }
+  .steps b { color: var(--text); font-weight: 600; }
+  .num {
+    flex: 0 0 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+    background: #10233a; color: var(--sky); font-size: 12px; font-family: var(--mono);
+  }
+  footer { margin-top: 22px; color: var(--muted); font-size: 12.5px; }
+  footer a { color: var(--sky); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  @media (max-width: 860px) { .panel { grid-template-columns: 1fr; } .legend { margin-left: 0; width: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .flow { animation: none; } button:hover { transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>dsh-project-memory · 架构与数据流</h1>
+    <p>人类掌控的项目记忆插件：注入带来源，检索只读且带行号，模型没有写入路径。</p>
+    <div class="meta">
+      <span class="pill">运行环境 <b>DeepSeek Harness / Cordis</b></span>
+      <span class="pill">注入顺序 <b>order -20</b></span>
+      <span class="pill">写入权限 <b>无</b></span>
+      <span class="pill">隔离边界 <b>会话 cwd</b></span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <button id="btn-all" aria-pressed="true">全部通路</button>
+    <button id="btn-inject" aria-pressed="false">注入</button>
+    <button id="btn-lookup" aria-pressed="false">检索</button>
+    <button id="btn-candidate" aria-pressed="false">候选</button>
+    <button id="btn-human" aria-pressed="false">人工回路</button>
+    <button id="btn-forbidden" aria-pressed="false">禁止路径</button>
+    <button id="btn-svg">导出 SVG</button>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--sky)"></i>读 / 注入</span>
+      <span><i class="swatch" style="background:var(--indigo)"></i>只读检索</span>
+      <span><i class="swatch" style="background:var(--emerald)"></i>候选写入</span>
+      <span><i class="swatch" style="background:var(--amber)"></i>人工回路</span>
+      <span><i class="swatch" style="background:var(--rose)"></i>禁止路径</span>
+    </div>
+  </div>
+
+  <div class="board">
+    <svg id="diagram" viewBox="0 0 1200 800" role="img" aria-labelledby="diagram-title">
+      <title id="diagram-title">dsh-project-memory 架构与数据流图</title>
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b6c94"></path>
+        </marker>
+        <marker id="arrow-hot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#e7edf9"></path>
+        </marker>
+        <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0.05"></stop>
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0"></stop>
+        </linearGradient>
+      </defs>
+
+      <g class="grid" opacity="0.55">
+        <line x1="0" y1="120" x2="1200" y2="120"></line>
+        <line x1="0" y1="300" x2="1200" y2="300"></line>
+        <line x1="0" y1="480" x2="1200" y2="480"></line>
+        <line x1="0" y1="650" x2="1200" y2="650"></line>
+      </g>
+
+      <text class="tag" x="60" y="106">工作区文件（会话 cwd）</text>
+      <text class="tag" x="400" y="106">project-memory 插件</text>
+      <text class="tag" x="740" y="106">DSH 会话</text>
+
+      <!-- 工作区 -->
+      <g class="node workspace" data-id="memory" data-hot="inject human forbidden"
+         data-title="MEMORY.md · 唯一事实来源"
+         data-desc="人类手写、随仓库提交的记忆文件。插件只读：每次构建提示词时读盘，按 maxChars 截断，注入时附来源路径与文件修改时间。">
+        <rect x="60" y="210" width="240" height="76" rx="12"></rect>
+        <rect x="60" y="210" width="240" height="76" rx="12" fill="url(#sheen)"></rect>
+        <text class="title" x="180" y="243" text-anchor="middle">MEMORY.md</text>
+        <text class="sub" x="180" y="264" text-anchor="middle">唯一事实来源 · 人类维护</text>
+      </g>
+      <g class="node workspace" data-id="candidates" data-hot="candidate human"
+         data-title=".dsh-memory-candidates.md · 候选暂存"
+         data-desc="由候选采集器追加的 - [ ] 清单，内容为用户消息的机械截取（去空白、最长 500 字符）。它只是提案，人工审阅后才并入 MEMORY.md。">
+        <rect x="60" y="430" width="240" height="76" rx="12"></rect>
+        <rect x="60" y="430" width="240" height="76" rx="12" fill="url(#sheen)"></rect>
+        <text class="title" x="180" y="463" text-anchor="middle">.dsh-memory-candidates.md</text>
+        <text class="sub" x="180" y="484" text-anchor="middle">候选暂存 · - [ ] 清单</text>
+      </g>
+
+      <!-- 插件 -->
+      <g class="node plugin" data-id="injector" data-hot="inject"
+         data-title="上下文注入器 · systemPrompt.context"
+         data-desc="以 order -20 注册运行时上下文；text 是函数，每次构建提示词时重新读盘，因此改完 MEMORY.md 立即生效。文件不存在时注入为空字符串。">
+        <rect x="400" y="150" width="240" height="76" rx="12"></rect>
+        <rect x="400" y="150" width="240" height="76" rx="12" fill="url(#sheen)"></rect>
+        <text class="title" x="520" y="183" text-anchor="middle">上下文注入器</text>
+        <text class="sub" x="520" y="204" text-anchor="middle">systemPrompt.context · order -20</text>
+      </g>
+      <g class="node plugin" data-id="tool" data-hot="lookup"
+         data-title="只读检索工具 · project_memory"
+         data-desc="按词面子串命中数排序（大小写不敏感），取前 maxMatches 行后按行号升序输出「行号: 原文」。工具只读，没有写入分支。">
+        <rect x="400" y="330" width="240" height="76" rx="12"></rect>
+        <rect x="400" y="330" width="240" height="76" rx="12" fill="url(#sheen)"></rect>
+        <text class="title" x="520" y="363" text-anchor="middle">只读检索工具</text>
+        <text class="sub" x="520" y="384" text-anchor="middle">project_memory(query)</text>
+      </g>
+      <g class="node plugin" data-id="collector" data-hot="candidate"
+         data-title="候选采集器 · agent/turn-stopping"
+         data-desc="每轮结束时增量扫描会话事件，仅采 source.kind === 'user' 的消息（排除插件注入的运行时上下文与模型输出），去重后受 maxCandidates / maxCandidateChars 双上限约束。">
+        <rect x="400" y="510" width="240" height="76" rx="12"></rect>
+        <rect x="400" y="510" width="240" height="76" rx="12" fill="url(#sheen)"></rect>
+        <text class="title" x="520" y="543" text-anchor="middle">候选采集器</text>
+        <text class="sub" x="520" y="564" text-anchor="middle">agent/turn-stopping · 仅用户消息</text>
+      </g>
+
+      <!-- 会话 -->
+      <g class="node session" data-id="prompt" data-hot="inject"
+         data-title="系统提示词"
+         data-desc="注入内容以「Project memory (human-maintained; source: …; updated: …)」开头，被截断时追加显式提示；文件不存在则完全不占上下文。">
+        <rect x="740" y="150" width="250" height="76" rx="12"></rect>
+        <rect x="740" y="150" width="250" height="76" rx="12" fill="url(#sheen)"></rect>
+        <text class="title" x="865" y="183" text-anchor="middle">系统提示词</text>
+        <text class="sub" x="865" y="204" text-anchor="middle">带来源标记的运行时上下文</text>
+      </g>
+      <g class="node session" data-id="agent" data-hot="inject lookup forbidden"
+         data-title="Agent 推理与工具调用"
+         data-desc="模型可以查询记忆、引用行号，也可以在回复里提出修改建议。它没有任何写入 MEMORY.md 的路径——这是代码层面的缺失，不是纪律要求。">
+        <rect x="740" y="330" width="250" height="76" rx="12"></rect>
+        <rect x="740" y="330" width="250" height="76" rx="12" fill="url(#sheen)"></rect>
+        <text class="title" x="865" y="363" text-anchor="middle">Agent 推理与工具调用</text>
+        <text class="sub" x="865" y="384" text-anchor="middle">读 + 提议，不写</text>
+      </g>
+      <g class="node session" data-id="events" data-hot="candidate"
+         data-title="会话事件流"
+         data-desc="带 seq 序号的事件队列。采集器记录每个会话已扫描到的位置，只处理新增事件，因此不会重复写入候选。">
+        <rect x="740" y="510" width="250" height="76" rx="12"></rect>
+        <rect x="740" y="510" width="250" height="76" rx="12" fill="url(#sheen)"></rect>
+        <text class="title" x="865" y="543" text-anchor="middle">会话事件流</text>
+        <text class="sub" x="865" y="564" text-anchor="middle">按 seq 增量扫描</text>
+      </g>
+
+      <!-- 人工 -->
+      <g class="node human" data-id="human" data-hot="human"
+         data-title="人类审阅 · Git 提交与合并"
+         data-desc="唯一有权写入 MEMORY.md 的角色：审阅候选、把确认的事实并入记忆文件，然后走常规 Git 流程提交。diff、blame、回滚都天然可用。">
+        <rect x="60" y="660" width="930" height="80" rx="14"></rect>
+        <rect x="60" y="660" width="930" height="80" rx="14" fill="url(#sheen)"></rect>
+        <text class="title" x="525" y="694" text-anchor="middle">人类审阅 · Git 提交与合并</text>
+        <text class="sub" x="525" y="716" text-anchor="middle">候选 → 审阅 → 并入 MEMORY.md · 记忆与代码同仓版本化</text>
+      </g>
+
+      <!-- 边：注入 -->
+      <path class="edge inject flow" data-path="inject" d="M 300 248 C 350 248, 350 188, 400 188"></path>
+      <text class="elabel" data-path="inject" x="330" y="196" text-anchor="middle">读取 + 附来源/时间</text>
+      <path class="edge inject obs" data-path="inject" d="M 640 188 L 740 188"></path>
+      <text class="elabel" data-path="inject" x="690" y="174" text-anchor="middle">order -20</text>
+      <path class="edge inject obs" data-path="inject" d="M 865 226 L 865 330"></path>
+      <text class="elabel" data-path="inject" x="872" y="282" text-anchor="start">组装上下文</text>
+
+      <!-- 边：检索 -->
+      <path class="edge lookup flow" data-path="lookup" d="M 740 352 L 640 352"></path>
+      <text class="elabel" data-path="lookup" x="690" y="340" text-anchor="middle">只读查询</text>
+      <path class="edge lookup obs" data-path="lookup" d="M 640 390 L 740 390"></path>
+      <text class="elabel" data-path="lookup" x="690" y="408" text-anchor="middle">行号引用摘录</text>
+
+      <!-- 边：候选 -->
+      <path class="edge candidate flow" data-path="candidate" d="M 740 548 L 640 548"></path>
+      <text class="elabel" data-path="candidate" x="690" y="538" text-anchor="middle">turn-stopping</text>
+      <path class="edge candidate obs" data-path="candidate" d="M 400 548 C 350 548, 350 468, 300 468"></path>
+      <text class="elabel" data-path="candidate" x="345" y="534" text-anchor="end">追加 - [ ] 条目</text>
+
+      <!-- 边：人工回路 -->
+      <path class="edge human obs" data-path="human" d="M 180 506 L 180 660"></path>
+      <text class="elabel" data-path="human" x="188" y="596" text-anchor="start">审阅候选</text>
+      <path class="edge human obs" data-path="human" d="M 60 700 L 30 700 L 30 248 L 60 248"></path>
+      <text class="vlabel" data-path="human" transform="rotate(-90 14 474)" x="14" y="474" text-anchor="middle">审阅后手工写入</text>
+
+      <!-- 边：禁止 -->
+      <path class="edge forbidden" data-path="forbidden" d="M 990 368 L 1010 368 L 1010 90 L 180 90 L 180 210"></path>
+      <text class="elabel warn" data-path="forbidden" x="600" y="74" text-anchor="middle">禁止直写：代码中不存在该路径</text>
+      <g class="badge-x" data-path="forbidden">
+        <circle cx="620" cy="90" r="10"></circle>
+        <text x="620" y="94.5" text-anchor="middle">×</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="panel">
+    <div class="card">
+      <h3 id="detail-title">悬停任一模块查看细节</h3>
+      <p id="detail-desc">这张图有四类角色：工作区文件、插件内的三条通路、DSH 会话，以及唯一的写入者——人。顶部的红色虚线是唯一的「捷径」，而它在代码里并不存在。点击上方按钮可以只看某一条通路。</p>
+    </div>
+    <div class="card">
+      <h3>一轮会话的生命周期</h3>
+      <ul class="steps">
+        <li><span class="num">1</span><span><b>注入</b>：构建提示词时读取 MEMORY.md，附来源与修改时间。</span></li>
+        <li><span class="num">2</span><span><b>检索</b>：模型按需调用 project_memory，拿到带行号的摘录。</span></li>
+        <li><span class="num">3</span><span><b>采集</b>：轮次结束，把本轮用户消息沉淀为候选条目。</span></li>
+        <li><span class="num">4</span><span><b>审阅</b>：人把确认的事实并入 MEMORY.md 并提交。</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    图例：实线为实际存在的数据通路，红色虚线为被明确禁止的路径 · 交互版可导出 SVG ·
+    相关文档：<a href="../README.md">README</a> · <a href="design.md">设计说明</a> · <a href="usage.md">使用手册</a> · <a href="intro.html">介绍页</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var svg = document.getElementById('diagram');
+  var title = document.getElementById('detail-title');
+  var desc = document.getElementById('detail-desc');
+  var defaultTitle = title.textContent;
+  var defaultDesc = desc.textContent;
+
+  var nodes = Array.prototype.slice.call(svg.querySelectorAll('.node'));
+  var edges = Array.prototype.slice.call(svg.querySelectorAll('.edge'));
+  var labels = Array.prototype.slice.call(svg.querySelectorAll('.elabel, .vlabel'));
+  var badges = Array.prototype.slice.call(svg.querySelectorAll('.badge-x'));
+
+  function setHot(path) {
+    edges.forEach(function (e) {
+      var on = path === 'all' || e.dataset.path === path;
+      e.classList.toggle('dim', !on);
+      e.classList.toggle('hot', path !== 'all' && on);
+      var marker = on && path !== 'all' ? 'url(#arrow-hot)' : 'url(#arrow)';
+      e.setAttribute('marker-end', marker);
+    });
+    labels.forEach(function (l) { l.classList.toggle('hot', path !== 'all' && l.dataset.path === path); });
+    badges.forEach(function (b) { b.style.opacity = (path === 'all' || path === 'forbidden') ? '1' : '0.2'; });
+    nodes.forEach(function (n) {
+      var hot = (n.dataset.hot || '').split(' ');
+      n.style.opacity = (path === 'all' || hot.indexOf(path) >= 0) ? '1' : '0.35';
+    });
+  }
+
+  function focusNode(node) {
+    title.textContent = node.dataset.title || defaultTitle;
+    desc.textContent = node.dataset.desc || defaultDesc;
+  }
+
+  nodes.forEach(function (n) {
+    n.addEventListener('mouseenter', function () { focusNode(n); });
+    n.addEventListener('click', function () {
+      nodes.forEach(function (m) { m.classList.remove('pinned'); });
+      n.classList.add('pinned');
+      focusNode(n);
+    });
+  });
+  svg.addEventListener('mouseleave', function () {
+    if (!svg.querySelector('.node.pinned')) { title.textContent = defaultTitle; desc.textContent = defaultDesc; }
+  });
+
+  var buttons = [
+    ['btn-all', 'all'], ['btn-inject', 'inject'], ['btn-lookup', 'lookup'],
+    ['btn-candidate', 'candidate'], ['btn-human', 'human'], ['btn-forbidden', 'forbidden']
+  ];
+  buttons.forEach(function (pair) {
+    var el = document.getElementById(pair[0]);
+    el.addEventListener('click', function () {
+      buttons.forEach(function (other) { document.getElementById(other[0]).setAttribute('aria-pressed', 'false'); });
+      el.setAttribute('aria-pressed', 'true');
+      setHot(pair[1]);
+    });
+  });
+  setHot('all');
+
+  document.getElementById('btn-svg').addEventListener('click', function () {
+    var clone = svg.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', '1200');
+    clone.setAttribute('height', '800');
+    var css = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    css.textContent = '.node rect{fill:#111a2e;stroke:#24314d;stroke-width:1.4}' +
+      '.node.workspace rect{stroke:#34d399}.node.plugin rect{stroke:#818cf8}' +
+      '.node.session rect{stroke:#38bdf8}.node.human rect{stroke:#fbbf24}' +
+      '.node .title{fill:#e7edf9;font-size:15px;font-weight:600}' +
+      '.node .sub,.elabel,.vlabel,.node .tag{fill:#94a3c4;font-size:11.5px}' +
+      '.edge{fill:none;stroke:#3d4d70;stroke-width:1.6}' +
+      '.edge.forbidden{stroke:#fb7185;stroke-dasharray:7 5}' +
+      '.elabel.warn{fill:#fb7185;font-weight:600}' +
+      '.badge-x circle{fill:#2a1220;stroke:#fb7185;stroke-width:1.4}' +
+      '.badge-x text{fill:#fb7185;font-size:12px;font-weight:700}' +
+      'text{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}';
+    clone.insertBefore(css, clone.firstChild);
+    var source = new XMLSerializer().serializeToString(clone);
+    var blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'dsh-project-memory-architecture.svg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+})();
+</script>
+</body>
+</html>

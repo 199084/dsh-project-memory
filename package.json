@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "type": "module",
-  "description": "Human-owned, project-scoped memory for DeepSeek Harness: MEMORY.md as labeled runtime context, read-only lookups with line citations, and lazy, human-approved memory updates. DeepSeek Harness 项目记忆插件：由人掌控，随仓库版本化，带来源注入与只读检索。",
+  "description": "Human-owned, project-scoped memory for DeepSeek Harness: MEMORY.md injected as labeled runtime context, read-only lookups with line citations, and human-reviewed candidate updates. DeepSeek Harness 项目记忆插件：由人掌控、随仓库版本化，带来源注入与只读检索，模型无写入权限。",
   "main": "index.mjs",
   "exports": {
     ".": "./index.mjs",
@@ -30,6 +30,7 @@
     "memory",
     "project-memory",
     "agent-memory",
+    "human-in-the-loop",
     "plugin"
   ]
 }
